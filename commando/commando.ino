@@ -45,7 +45,6 @@
 #define address 100              //default I2C ID number for EZO EC Circuit.
 
 
-millisDelay runTime;
 
 char computerdata[20];           //we make a 20 byte character array to hold incoming data from a pc/mac/other.
 byte received_from_computer = 0; //we need to know how many characters have been received.
@@ -75,6 +74,10 @@ byte fillRelay(8,OUTPUT);
 byte runStateSignal(5,INPUT);
 byte awayModeSignal(4,INPUT);
 
+//define timing variables
+millisDelay runTime;
+int maxRunTime = 14400000;
+int highTdsDelay = 300000;
 
 void setup(){                     //hardware initialization
   Serial.begin(9600);            //enable serial port.
@@ -144,7 +147,7 @@ void loop() {                                                              //the
     }
 
 
-    //if (computerdata[0] == 'r') string_pars(); //uncomment this function if you would like to break up the comma separated string into its individual parts.
+    if (computerdata[0] == 'r') string_pars(); //uncomment this function if you would like to break up the comma separated string into its individual parts.
 
   }
 
@@ -185,11 +188,37 @@ void startPump(){
     digitalWrite(fillRelay,LOW);
 
     // Start Run Timer
-    runTime.start();
+    runTime.start(maxRunTime);
+
+}
+
+void stopPump(){
+
+    // Set Relay State
+    digitalWrite(pumpRelay,LOW);
+    digitalWrite(dischargeRelay,HIGH);
+    delay(2000);                            //Delay 2 Seconds to release pressure.
+    digitalWrite(dischargeRelay,LOW);
+    digitalWrite(fillRelay,LOW);
 
 
 }
 
+void fillTank(){
+
+
+    // Set Delay State
+    digitalWrite(dischargeRelay,LOW);
+    digitalWrite(fillRelay,HIGH);
+
+}
+
+void alertState(){
+
+    stopPump();
+    
+
+}
 
 /*
  *
