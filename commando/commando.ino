@@ -12,6 +12,22 @@
  # 2. 4 Channel Relay Shield
  # 3. Atlantic Scientific Conductivity Circuit
  # 4. Atlantic Scientific Conductivity Probe
+ # 
+ # D0
+ # D1
+ # D2-pumpRelay
+ # D3
+ # D4-awayModeSignal
+ # D5-runStateSignal
+ # D6
+ # D7-dischargeRelay
+ # D8-fillRelay
+ # D9
+ # D10-spareRelay
+ # D11
+ # D12
+ # D13
+ # GND Aref
  #
  #
  # */
@@ -45,6 +61,8 @@ byte fillRelay(8,OUTPUT);
 //byte spareRelay(10,OUTPUT);
 
 //Define Sensors and Logic input
+byte runStateSignal(5,INPUT);
+byte awayModeSignal(4,INPUT);
 
 
 void setup(){                     //hardware initialization
