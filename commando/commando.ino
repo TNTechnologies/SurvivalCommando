@@ -12,7 +12,15 @@
  # 2. 4 Channel Relay Shield
  # 3. Atlantic Scientific Conductivity Circuit
  # 4. Atlantic Scientific Conductivity Probe
- # 
+ #
+ # A0
+ # A1
+ # A2
+ # A3
+ # A4- SDA
+ # A5- SCL
+ #
+ #
  # D0
  # D1
  # D2-pumpRelay
@@ -32,9 +40,12 @@
  #
  # */
 
+#include <millisDelay.h>
 #include <Wire.h>                //enable I2C.
 #define address 100              //default I2C ID number for EZO EC Circuit.
 
+
+millisDelay runTime;
 
 char computerdata[20];           //we make a 20 byte character array to hold incoming data from a pc/mac/other.
 byte received_from_computer = 0; //we need to know how many characters have been received.
@@ -58,7 +69,7 @@ float sg_float;                  //float var used to hold the float value of the
 byte pumpRelay(2,OUTPUT);
 byte dischareRelay(7,OUTPUT);
 byte fillRelay(8,OUTPUT);
-//byte spareRelay(10,OUTPUT);
+//byte spareRelay(10,OUTPUT);    //Disabled
 
 //Define Sensors and Logic input
 byte runStateSignal(5,INPUT);
@@ -71,7 +82,7 @@ void setup(){                     //hardware initialization
   digitalWrite(pumpRelay,LOW);
   digitalWrite(dischargeRelay,LOW);
   digitalWrite(fillRelay,LOW);
-//digitalWrite(spareRelay,LOW);
+//digitalWrite(spareRelay,LOW);    //Disable
 
 
 }
@@ -147,7 +158,6 @@ void string_pars() {                  //this function will break up the CSV stri
   sg = strtok(NULL, ",");             //let's pars the string at each comma.
 
   Serial.print("EC:");                //we now print each value we parsed separately.
-
   Serial.println(ec);                 //this is the EC value.
 
   Serial.print("TDS:");               //we now print each value we parsed separately.
@@ -169,18 +179,21 @@ void string_pars() {                  //this function will break up the CSV stri
 
 void startPump(){
 
+    // Set Relay States
     digitalWrite(pumpRelay,HIGH);
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
+
+    // Start Run Timer
+    runTime.start();
 
 
 }
 
 
-
 /*
  *
- *int led = 13;
+int led = 13;
 // Pin 13 has an LED connected on most Arduino boards.
 
 millisDelay ledDelay;
