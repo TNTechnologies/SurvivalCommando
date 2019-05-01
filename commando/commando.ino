@@ -64,7 +64,6 @@ float sal_float;                 //float var used to hold the float value of the
 float sg_float;                  //float var used to hold the float value of the specific gravity.
 
 // Values for sensor readings
-
 float potableWater = 150;
 
 //Define Relay Pins
@@ -86,6 +85,7 @@ millisDelay runTime;
 millisDelay highTDS;
 int maxRunTime = 14400000;
 int highTdsDelay = 600000;
+int restTime = 1200000;
 
 void setup(){                     //hardware initialization
   Serial.begin(9600);            //enable serial port.
@@ -190,7 +190,7 @@ void loop() {                                                              //the
    if (running == 0) {
 
       startPump();
-      delay(60000);
+      delay(30000);
 
     }
 
@@ -212,9 +212,23 @@ void loop() {                                                              //the
 
     }
 
+    if (runTime.finished) {
+
+      stopPump();
+      delay(restTime);
+
+    }
+
+    if (highTDS.finished) {
+
+      tdsAlarm();
+
+    }
+
   }
 
 }
+
 void string_pars() {                  //this function will break up the CSV string into its 4 individual parts. EC|TDS|SAL|SG.
                                       //this is done using the C command “strtok”.
 
@@ -222,7 +236,7 @@ void string_pars() {                  //this function will break up the CSV stri
   tds = strtok(NULL, ",");            //let's pars the string at each comma.
   sal = strtok(NULL, ",");            //let's pars the string at each comma.
   sg = strtok(NULL, ",");             //let's pars the string at each comma.
-      if (Serial.available() > 0) {                                             //if data is holding in the serial buffer
+    if (Serial.available() > 0) {                                             //if data is holding in the serial buffer
 
          Serial.print("EC:");                //we now print each value we parsed separately.
          Serial.println(ec);                 //this is the EC value.
@@ -273,10 +287,10 @@ void stopPump(){
 
 void fillTank(){
 
-
     // Set Relay State
     digitalWrite(dischargeRelay,LOW);
     digitalWrite(fillRelay,HIGH);
+    highTDS.stop();
 
 }
 
@@ -295,35 +309,12 @@ void highTDSState(){
 
 }
 
-void normalTDS(){
+void tdsAlarm(){
 
-    fillTank();
-    highTDS.stop();
+    stopPump();
+    delay(restTime);
 
 }
 
 
-/*
- *
-int led = 13;
-// Pin 13 has an LED connected on most Arduino boards.
-
-millisDelay ledDelay;
-
-void setup() {
-
-  // initialize the digital pin as an output.
-  pinMode(led, OUTPUT);
-  digitalWrite(led, HIGH); // turn led on
-
-  // start delay
-  ledDelay.start(10000);
-}
-
-void loop() {
-  // check if delay has timed out
-  if (ledDelay.isFinished()) {
-    digitalWrite(led, LOW); // turn led off
-  }
-}
 
