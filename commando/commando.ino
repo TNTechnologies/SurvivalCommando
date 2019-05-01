@@ -12,14 +12,14 @@
  # 2. 4 Channel Relay Shield
  # 3. Atlantic Scientific Conductivity Circuit
  # 4. Atlantic Scientific Conductivity Probe
+ # 5. Universal 150PSI Pressure Transducer
  #
- # A0
+ # A0- Pressure Signal
  # A1
  # A2
  # A3
  # A4- SDA
  # A5- SCL
- #
  #
  # D0
  # D1
@@ -37,8 +37,7 @@
  # D13
  # GND Aref
  #
- #
- # */
+ */
 
 #include <millisDelay.h>
 #include <Wire.h>                //enable I2C.
@@ -77,11 +76,14 @@ byte awayModeSignal(4,INPUT);
 //define timing variables
 millisDelay runTime;
 int maxRunTime = 14400000;
-int highTdsDelay = 300000;
+int highTdsDelay = 600000;
+millisDelay highTDS;
 
 void setup(){                     //hardware initialization
   Serial.begin(9600);            //enable serial port.
   Wire.begin();                  //enable I2C port.
+
+//
   digitalWrite(pumpRelay,LOW);
   digitalWrite(dischargeRelay,LOW);
   digitalWrite(fillRelay,LOW);
@@ -172,7 +174,7 @@ void string_pars() {                  //this function will break up the CSV stri
   Serial.print("SG:");               //we now print each value we parsed separately.
   Serial.println(sg);                //this is the specific gravity.
   Serial.println();                  //this just makes the output easier to read by adding an extra blank line 
-    
+
   //uncomment this section if you want to take the values and convert them into floating point number.
     ec_float=atof(ec);
     tds_float=atof(tds);
@@ -196,29 +198,45 @@ void stopPump(){
 
     // Set Relay State
     digitalWrite(pumpRelay,LOW);
+    digitalWrite(fillRelay,LOW);
     digitalWrite(dischargeRelay,HIGH);
     delay(2000);                            //Delay 2 Seconds to release pressure.
     digitalWrite(dischargeRelay,LOW);
-    digitalWrite(fillRelay,LOW);
-
+    runTime.stop();
 
 }
 
 void fillTank(){
 
 
-    // Set Delay State
+    // Set Relay State
     digitalWrite(dischargeRelay,LOW);
     digitalWrite(fillRelay,HIGH);
 
 }
 
-void alertState(){
+void dischargeProduct(){
 
-    stopPump();
-    
+    digitalWrite(dischargeRelay,HIGH);
+    digitalWrite(fillRelay,LOW);
 
 }
+
+
+void highTDSState(){
+
+    dischargeProduct();
+    highTDS.start(highTdsDelay);
+
+}
+
+void normalTDS(){
+
+    fillTank();
+    highTDS.stop();
+
+}
+
 
 /*
  *
