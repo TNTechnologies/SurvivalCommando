@@ -63,6 +63,10 @@ float tds_float;                 //float var used to hold the float value of the
 float sal_float;                 //float var used to hold the float value of the salinity.
 float sg_float;                  //float var used to hold the float value of the specific gravity.
 
+// Values for sensor readings
+
+float potableWater = 150;
+
 //Define Relay Pins
 byte pumpRelay(2,OUTPUT);
 byte dischareRelay(7,OUTPUT);
@@ -73,11 +77,15 @@ byte fillRelay(8,OUTPUT);
 byte runStateSignal(5,INPUT);
 byte awayModeSignal(4,INPUT);
 
+// State buffers
+int running = 0;
+int saturatedMembrane = 0;
+
 //define timing variables
 millisDelay runTime;
+millisDelay highTDS;
 int maxRunTime = 14400000;
 int highTdsDelay = 600000;
-millisDelay highTDS;
 
 void setup(){                     //hardware initialization
   Serial.begin(9600);            //enable serial port.
@@ -153,6 +161,59 @@ void loop() {                                                              //the
 
   }
 
+  if (digitalRead(runStateSignal) == 1) {
+
+    Wire.beginTransmission(address);
+    Wire.write('r');                                               //transmit the command that was sent through the serial port.
+    Wire.endTransmission();                                                 //end the I2C data transmission.
+
+    delay(time_);                                                         //wait the correct amount of time for the circuit to complete its instruction.
+
+
+    while (Wire.available()) {                 //are there bytes to receive.
+
+       in_char = Wire.read();                   //receive a byte.
+       ec_data[i] = in_char;                    //load this byte into our array.
+       i += 1;                                  //incur the counter for the array element.
+       if (in_char == 0) {                      //if we see that we have been sent a null command.
+
+         i = 0;                                 //reset the counter i to 0.
+         Wire.endTransmission();                //end the I2C data transmission.
+         break;                                 //exit the while loop.
+
+       }
+
+     }
+
+   string_pars();
+
+   if (running == 0) {
+
+      startPump();
+      delay(60000);
+
+    }
+
+    if (tds_float < potableWater) {
+
+      fillTank();
+      saturatedMembrane = 1;
+
+    }
+    else if (saturatedMembrane == 1) {
+
+      highTDSState();
+
+    }
+
+    else {
+
+      dischargeProduct();
+
+    }
+
+  }
+
 }
 void string_pars() {                  //this function will break up the CSV string into its 4 individual parts. EC|TDS|SAL|SG.
                                       //this is done using the C command “strtok”.
@@ -161,20 +222,21 @@ void string_pars() {                  //this function will break up the CSV stri
   tds = strtok(NULL, ",");            //let's pars the string at each comma.
   sal = strtok(NULL, ",");            //let's pars the string at each comma.
   sg = strtok(NULL, ",");             //let's pars the string at each comma.
+      if (Serial.available() > 0) {                                             //if data is holding in the serial buffer
 
-  Serial.print("EC:");                //we now print each value we parsed separately.
-  Serial.println(ec);                 //this is the EC value.
+         Serial.print("EC:");                //we now print each value we parsed separately.
+         Serial.println(ec);                 //this is the EC value.
 
-  Serial.print("TDS:");               //we now print each value we parsed separately.
-  Serial.println(tds);                //this is the TDS value.
+         Serial.print("TDS:");               //we now print each value we parsed separately.
+         Serial.println(tds);                //this is the TDS value.
 
-  Serial.print("SAL:");               //we now print each value we parsed separately.
-  Serial.println(sal);                //this is the salinity value.
+         Serial.print("SAL:");               //we now print each value we parsed separately.
+         Serial.println(sal);                //this is the salinity value.
 
-  Serial.print("SG:");               //we now print each value we parsed separately.
-  Serial.println(sg);                //this is the specific gravity.
-  Serial.println();                  //this just makes the output easier to read by adding an extra blank line 
-
+         Serial.print("SG:");               //we now print each value we parsed separately.
+         Serial.println(sg);                //this is the specific gravity.
+         Serial.println();                  //this just makes the output easier to read by adding an extra blank line 
+    }
   //uncomment this section if you want to take the values and convert them into floating point number.
     ec_float=atof(ec);
     tds_float=atof(tds);
@@ -191,6 +253,7 @@ void startPump(){
 
     // Start Run Timer
     runTime.start(maxRunTime);
+    running = 1;
 
 }
 
@@ -203,6 +266,8 @@ void stopPump(){
     delay(2000);                            //Delay 2 Seconds to release pressure.
     digitalWrite(dischargeRelay,LOW);
     runTime.stop();
+    running = 0;
+    saturatedMembrane = 0;
 
 }
 
