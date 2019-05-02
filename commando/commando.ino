@@ -69,14 +69,14 @@ const float offset = 0.483;
 float voltage, pressure;
 
 //Define Relay Pins
-byte pumpRelay(2,OUTPUT);
-byte dischargeRelay(7,OUTPUT);
-byte fillRelay(8,OUTPUT);
+byte pumpRelay = 2;
+byte dischargeRelay = 7;
+byte fillRelay = 8;
 //byte spareRelay(10,OUTPUT);    //Disabled
 
 //Define Sensors and Logic input
-byte runStateSignal(5,INPUT);
-byte awayModeSignal(4,INPUT);
+byte runStateSignal = 5;
+byte awayModeSignal = 4;
 
 // State buffers
 int running = 0;
@@ -93,13 +93,23 @@ int restTime = 1200000;
 int awayModeDelay = 259200000;
 
 // Define LED Output
-byte tdsLED(13,OUTPUT);
-byte pressureLED(12,OUTPUT);
+byte tdsLED = 13;
+byte pressureLED = 12;
 
 
 void setup(){                     //hardware initialization
   Serial.begin(9600);            //enable serial port.
   Wire.begin();                  //enable I2C port.
+
+pinMode(runStateSignal,INPUT);
+pinMode(awayModeSignal,INPUT);
+
+pinMode(pumpRelay,OUTPUT);
+pinMode(dischargeRelay,OUTPUT);
+pinMode(fillRelay,OUTPUT);
+
+pinMode(tdsLED,OUTPUT);
+pinMode(pressureLED,OUTPUT);
 
 //
   digitalWrite(pumpRelay,LOW);
@@ -175,13 +185,11 @@ void loop() {                                                              //the
 
   }
 
-  if (digitalRead(awayModeSignal) > 0) {
+  if (digitalRead(awayModeSignal) == 1) {
     if (awayModeState == 0) {
         awayModeState = 1;
         awayModeTimer.start(awayModeDelay);
     }
-    else
-        break;
   }
 
   if (digitalRead(awayModeSignal) == 0) {
@@ -189,13 +197,14 @@ void loop() {                                                              //the
     awayModeTimer.stop();
   }
 
-  if (awayModeTimer.isFinished) {
-    break;
+  if (awayModeTimer.isFinished()) {
+        delay(restTime);
   }
+
 
   else if (digitalRead(runStateSignal) == HIGH) {
 
-    voltage = analogRead() * 5.00 / 1024;
+    voltage = analogRead(A0) * 5.00 / 1024;
     pressure = (voltage - offset) * 400;
 
     Wire.beginTransmission(address);
