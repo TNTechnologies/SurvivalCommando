@@ -33,8 +33,8 @@
  # D9
  # D10-spareRelay
  # D11
- # D12
- # D13
+ # D12 Pressure Led
+ # D13 High TDS Led
  # GND Aref
  #
  */
@@ -65,10 +65,12 @@ float sg_float;                  //float var used to hold the float value of the
 
 // Values for sensor readings
 float potableWater = 150;
+const float offset = 0.483;
+float voltage, pressure;
 
 //Define Relay Pins
 byte pumpRelay(2,OUTPUT);
-byte dischareRelay(7,OUTPUT);
+byte dischargeRelay(7,OUTPUT);
 byte fillRelay(8,OUTPUT);
 //byte spareRelay(10,OUTPUT);    //Disabled
 
@@ -79,13 +81,21 @@ byte awayModeSignal(4,INPUT);
 // State buffers
 int running = 0;
 int saturatedMembrane = 0;
+int awayModeState = 0;
 
 //define timing variables
 millisDelay runTime;
 millisDelay highTDS;
+millisDelay awayModeTimer;
 int maxRunTime = 14400000;
 int highTdsDelay = 600000;
 int restTime = 1200000;
+int awayModeDelay = 259200000;
+
+// Define LED Output
+byte tdsLED(13,OUTPUT);
+byte pressureLED(12,OUTPUT);
+
 
 void setup(){                     //hardware initialization
   Serial.begin(9600);            //enable serial port.
@@ -97,8 +107,12 @@ void setup(){                     //hardware initialization
   digitalWrite(fillRelay,LOW);
 //digitalWrite(spareRelay,LOW);    //Disable
 
+  running = 0;
+  saturatedMembrane = 0;
+  awayModeState = 0;
 
 }
+
 void loop() {                                                              //the main loop.
 
   if (Serial.available() > 0) {                                             //if data is holding in the serial buffer
@@ -161,7 +175,28 @@ void loop() {                                                              //the
 
   }
 
-  if (digitalRead(runStateSignal) == 1) {
+  if (digitalRead(awayModeSignal) > 0) {
+    if (awayModeState == 0) {
+        awayModeState = 1;
+        awayModeTimer.start(awayModeDelay);
+    }
+    else
+        break;
+  }
+
+  if (digitalRead(awayModeSignal) == 0) {
+    awayModeState = 0;
+    awayModeTimer.stop();
+  }
+
+  if (awayModeTimer.isFinished) {
+    break;
+  }
+
+  else if (digitalRead(runStateSignal) == HIGH) {
+
+    voltage = analogRead() * 5.00 / 1024;
+    pressure = (voltage - offset) * 400;
 
     Wire.beginTransmission(address);
     Wire.write('r');                                               //transmit the command that was sent through the serial port.
@@ -180,54 +215,48 @@ void loop() {                                                              //the
          i = 0;                                 //reset the counter i to 0.
          Wire.endTransmission();                //end the I2C data transmission.
          break;                                 //exit the while loop.
-
        }
-
      }
 
    string_pars();
 
-   if (running == 0) {
-
+    if (running == 0) {
       startPump();
       delay(30000);
-
     }
 
     if (tds_float < potableWater) {
-
       fillTank();
       saturatedMembrane = 1;
-
     }
+
     else if (saturatedMembrane == 1) {
-
       highTDSState();
-
     }
 
     else {
-
       dischargeProduct();
-
     }
 
-    if (runTime.finished) {
-
+    if (runTime.isFinished()) {
       stopPump();
       delay(restTime);
-
     }
 
-    if (highTDS.finished) {
-
+    if (highTDS.isFinished()) {
       tdsAlarm();
-
     }
 
+    if (pressure > 345) {
+      pressureAlert();
+    }
   }
 
+  else if (running == 1) {
+    stopPump();
+  }
 }
+
 
 void string_pars() {                  //this function will break up the CSV string into its 4 individual parts. EC|TDS|SAL|SG.
                                       //this is done using the C command “strtok”.
@@ -259,7 +288,6 @@ void string_pars() {                  //this function will break up the CSV stri
 }
 
 void startPump(){
-
     // Set Relay States
     digitalWrite(pumpRelay,HIGH);
     digitalWrite(dischargeRelay,HIGH);
@@ -268,11 +296,9 @@ void startPump(){
     // Start Run Timer
     runTime.start(maxRunTime);
     running = 1;
-
 }
 
 void stopPump(){
-
     // Set Relay State
     digitalWrite(pumpRelay,LOW);
     digitalWrite(fillRelay,LOW);
@@ -282,39 +308,36 @@ void stopPump(){
     runTime.stop();
     running = 0;
     saturatedMembrane = 0;
-
 }
 
 void fillTank(){
-
     // Set Relay State
     digitalWrite(dischargeRelay,LOW);
     digitalWrite(fillRelay,HIGH);
     highTDS.stop();
-
 }
 
 void dischargeProduct(){
-
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
-
 }
 
 
 void highTDSState(){
-
     dischargeProduct();
     highTDS.start(highTdsDelay);
-
 }
 
 void tdsAlarm(){
-
     stopPump();
+    digitalWrite(tdsLED, HIGH);
     delay(restTime);
-
 }
 
+void pressureAlert(){
+    stopPump();
+    digitalWrite(pressureLED,HIGH);
+    delay(restTime);
+}
 
 
