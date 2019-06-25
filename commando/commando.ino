@@ -94,11 +94,11 @@ int restTime = 1200000;
 int awayModeDelay = 259200000;
 int shortStrokeDelay = 5000;
 int dayCycle = 86400000;
+int flushCycle = 600000;
 
 // Define LED Output
 byte tdsLED = 13;
 byte pressureLED = 12;
-
 
 void setup(){                     //hardware initialization
   Serial.begin(9600);            //enable serial port.
@@ -372,7 +372,7 @@ void pressureAlert(){
 
 void dailyCycle(){
     startPump();
-    delay();
+    delay(flushCycle);
     stopPump();
 }
 
