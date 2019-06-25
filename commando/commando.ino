@@ -186,10 +186,9 @@ void loop() {                                                              //the
 
 
     if (computerdata[0] == 'r') string_pars(); //uncomment this function if you would like to break up the comma separated string into its individual parts.
-
   }
 
-  if (dayCycleTimer.isFinished()) {
+  if (dayCycleTimer.justFinished()) {
     dailyCycle();
   }
 
@@ -205,7 +204,7 @@ void loop() {                                                              //the
     awayModeTimer.stop();
   }
 
-  if (awayModeTimer.isFinished()) {
+  if (awayModeTimer.justFinished()) {
         delay(restTime);
   }
 
@@ -254,12 +253,12 @@ void loop() {                                                              //the
       dischargeProduct();
     }
 
-    if (runTime.isFinished()) {
+    if (runTime.justFinished()) {
       stopPump();
       delay(restTime);
     }
 
-    if (highTDS.isFinished()) {
+    if (highTDS.justFinished()) {
       tdsAlarm();
     }
 
