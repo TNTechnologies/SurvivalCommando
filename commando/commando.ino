@@ -100,7 +100,7 @@ int flushCycle = 600000;
 byte tdsLED = 13;
 byte pressureLED = 12;
 
-void setup(){                     //hardware initialization
+void setup(){                    //hardware initialization
   Serial.begin(9600);            //enable serial port.
   Wire.begin();                  //enable I2C port.
 
@@ -114,15 +114,16 @@ pinMode(fillRelay,OUTPUT);
 pinMode(tdsLED,OUTPUT);
 pinMode(pressureLED,OUTPUT);
 
-//
-  digitalWrite(pumpRelay,LOW);
-  digitalWrite(dischargeRelay,LOW);
-  digitalWrite(fillRelay,LOW);
+digitalWrite(pumpRelay,LOW);
+digitalWrite(dischargeRelay,LOW);
+digitalWrite(fillRelay,LOW);
 //digitalWrite(spareRelay,LOW);    //Disable
 
-  running = 0;
-  saturatedMembrane = 0;
-  awayModeState = 0;
+running = 0;
+saturatedMembrane = 0;
+awayModeState = 0;
+
+dayCycleTimer.start(dayCycle);
 
 }
 
@@ -211,8 +212,8 @@ void loop() {                                                              //the
 
   else if (digitalRead(runStateSignal) == 1) {
 
-   // voltage = analogRead(A0) * 5.00 / 1024;
-   //  pressure = (voltage - offset) * 400;
+    // voltage = analogRead(A0) * 5.00 / 1024;
+    // pressure = (voltage - offset) * 400;
 
     Wire.beginTransmission(address);
     Wire.write('r');                                               //transmit the command that was sent through the serial port.
@@ -227,14 +228,13 @@ void loop() {                                                              //the
        ec_data[i] = in_char;                    //load this byte into our array.
        i += 1;                                  //incur the counter for the array element.
        if (in_char == 0) {                      //if we see that we have been sent a null command.
-
          i = 0;                                 //reset the counter i to 0.
          Wire.endTransmission();                //end the I2C data transmission.
          break;                                 //exit the while loop.
        }
      }
 
-   string_pars();
+    string_pars();
 
     if (running == 0) {
       startPump();
@@ -271,14 +271,10 @@ void loop() {                                                              //the
     }
 */
 
-
   }
   else if (running == 1) {
     stopPump();
-    
   }
-
-  
 
 }
 
@@ -290,6 +286,7 @@ void string_pars() {                  //this function will break up the CSV stri
   tds = strtok(NULL, ",");            //let's pars the string at each comma.
   sal = strtok(NULL, ",");            //let's pars the string at each comma.
   sg = strtok(NULL, ",");             //let's pars the string at each comma.
+
     if (Serial.available() > 0) {                                             //if data is holding in the serial buffer
 
          Serial.print("EC:");                //we now print each value we parsed separately.
@@ -305,7 +302,7 @@ void string_pars() {                  //this function will break up the CSV stri
          Serial.println(sg);                //this is the specific gravity.
          Serial.println();                  //this just makes the output easier to read by adding an extra blank line 
     }
-  //uncomment this section if you want to take the values and convert them into floating point number.
+
     ec_float=atof(ec);
     tds_float=atof(tds);
     sal_float=atof(sal);
@@ -322,7 +319,6 @@ void startPump(){
     runTime.start(maxRunTime);
     running = 1;
     dayCycleTimer.stop();
-
 }
 
 void stopPump(){
@@ -337,7 +333,6 @@ void stopPump(){
     saturatedMembrane = 0;
   //  digitalWrite(runStateSignal, LOW);
     dayCycleTimer.start(dayCycle);
-
 }
 
 void fillTank(){
