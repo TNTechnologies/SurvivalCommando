@@ -64,7 +64,7 @@ float sal_float;                 //float var used to hold the float value of the
 float sg_float;                  //float var used to hold the float value of the specific gravity.
 
 // Values for sensor readings
-float potableWater = 150;
+float potableWater = 1500;
 const float offset = 0.483;
 float voltage, pressure;
 
@@ -87,10 +87,13 @@ int awayModeState = 0;
 millisDelay runTime;
 millisDelay highTDS;
 millisDelay awayModeTimer;
+millisDelay dayCycleTimer;
 int maxRunTime = 14400000;
 int highTdsDelay = 600000;
 int restTime = 1200000;
 int awayModeDelay = 259200000;
+int shortStrokeDelay = 5000;
+int dayCycle = 86400000;
 
 // Define LED Output
 byte tdsLED = 13;
@@ -185,6 +188,10 @@ void loop() {                                                              //the
 
   }
 
+  if (dayCycleTimer.isFinished()) {
+    dailyCycle();
+  }
+
   if (digitalRead(awayModeSignal) == 1) {
     if (awayModeState == 0) {
         awayModeState = 1;
@@ -202,10 +209,10 @@ void loop() {                                                              //the
   }
 
 
-  else if (digitalRead(runStateSignal) == HIGH) {
+  else if (digitalRead(runStateSignal) == 1) {
 
-    voltage = analogRead(A0) * 5.00 / 1024;
-    pressure = (voltage - offset) * 400;
+   // voltage = analogRead(A0) * 5.00 / 1024;
+   //  pressure = (voltage - offset) * 400;
 
     Wire.beginTransmission(address);
     Wire.write('r');                                               //transmit the command that was sent through the serial port.
@@ -234,7 +241,7 @@ void loop() {                                                              //the
       delay(30000);
     }
 
-    if (tds_float < potableWater) {
+    if (ec_float < potableWater) {
       fillTank();
       saturatedMembrane = 1;
     }
@@ -256,14 +263,23 @@ void loop() {                                                              //the
       tdsAlarm();
     }
 
+    delay(shortStrokeDelay);
+
+/*
     if (pressure > 345) {
       pressureAlert();
     }
-  }
+*/
 
+
+  }
   else if (running == 1) {
     stopPump();
+    
   }
+
+  
+
 }
 
 
@@ -305,6 +321,8 @@ void startPump(){
     // Start Run Timer
     runTime.start(maxRunTime);
     running = 1;
+    dayCycleTimer.stop();
+
 }
 
 void stopPump(){
@@ -317,6 +335,9 @@ void stopPump(){
     runTime.stop();
     running = 0;
     saturatedMembrane = 0;
+  //  digitalWrite(runStateSignal, LOW);
+    dayCycleTimer.start(dayCycle);
+
 }
 
 void fillTank(){
@@ -349,4 +370,9 @@ void pressureAlert(){
     delay(restTime);
 }
 
+void dailyCycle(){
+    startPump();
+    delay();
+    stopPump();
+}
 
