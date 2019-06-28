@@ -88,13 +88,13 @@ millisDelay runTime;
 millisDelay highTDS;
 millisDelay awayModeTimer;
 millisDelay dayCycleTimer;
-int maxRunTime = 14400000;
-int highTdsDelay = 600000;
-int restTime = 1200000;
-int awayModeDelay = 259200000;
-int shortStrokeDelay = 5000;
-int dayCycle = 86400000;
-int flushCycle = 600000;
+unsigned long maxRunTime = 14400000;
+unsigned long highTdsDelay = 600000;
+unsigned long restTime = 1200000;
+unsigned long awayModeDelay = 259200000;
+unsigned long shortStrokeDelay = 20000;
+unsigned long dayCycle = 86400000;
+unsigned long flushCycle = 600000;
 
 // Define LED Output
 byte tdsLED = 13;
