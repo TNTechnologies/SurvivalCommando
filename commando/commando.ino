@@ -88,6 +88,7 @@ millisDelay runTime;
 millisDelay highTDS;
 millisDelay awayModeTimer;
 millisDelay dayCycleTimer;
+millisDelay shortStrokeTimer;
 unsigned long maxRunTime = 14400000;
 unsigned long highTdsDelay = 600000;
 unsigned long restTime = 1200000;
@@ -190,6 +191,12 @@ void loop() {                                                              //the
 
   if (dayCycleTimer.justFinished()) {
     dailyCycle();
+    serial.println("Day Cycle Started");
+  }
+
+  if (shortStrokeTimer.justFinished()) {
+    stopPump();
+    Serial.println("Short stroke prevention timer finished"
   }
 
   if (digitalRead(awayModeSignal) == 1) {
@@ -206,10 +213,13 @@ void loop() {                                                              //the
 
   if (awayModeTimer.justFinished()) {
         delay(restTime);
+        Serial.println("Away mode timer finished");
   }
 
 
   else if (digitalRead(runStateSignal) == 1) {
+
+    shortStrokeTimer.stop();
 
     // voltage = analogRead(A0) * 5.00 / 1024;
     // pressure = (voltage - offset) * 400;
@@ -262,7 +272,7 @@ void loop() {                                                              //the
       tdsAlarm();
     }
 
-    delay(shortStrokeDelay);
+    delay(1000);
 
 /*
     if (pressure > 345) {
@@ -272,7 +282,7 @@ void loop() {                                                              //the
 
   }
   else if (running == 1) {
-    stopPump();
+    dayCycleTimer.start(shortStrokeDelay);
   }
 
 }
@@ -313,11 +323,11 @@ void startPump(){
     digitalWrite(pumpRelay,HIGH);
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
-
     // Start Run Timer
     runTime.start(maxRunTime);
     running = 1;
     dayCycleTimer.stop();
+    Serial.println("System started");
 }
 
 void stopPump(){
@@ -332,6 +342,7 @@ void stopPump(){
     saturatedMembrane = 0;
   //  digitalWrite(runStateSignal, LOW);
     dayCycleTimer.start(dayCycle);
+    Serial.println("System Stopped");
 }
 
 void fillTank(){
@@ -339,11 +350,13 @@ void fillTank(){
     digitalWrite(dischargeRelay,LOW);
     digitalWrite(fillRelay,HIGH);
     highTDS.stop();
+    Serial.println("Fill tank");
 }
 
 void dischargeProduct(){
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
+    Serial.println("Discharge Product");
 }
 
 
@@ -356,12 +369,14 @@ void tdsAlarm(){
     stopPump();
     digitalWrite(tdsLED, HIGH);
     delay(restTime);
+    Serial.println("High TDS check membrane");
 }
 
 void pressureAlert(){
     stopPump();
     digitalWrite(pressureLED,HIGH);
     delay(restTime);
+    Serial.println("High Pressure");
 }
 
 void dailyCycle(){
