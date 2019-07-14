@@ -82,6 +82,7 @@ byte awayModeSignal = 4;
 int running = 0;
 int saturatedMembrane = 0;
 int awayModeState = 0;
+int shortStroke = 0;
 
 //define timing variables
 millisDelay runTime;
@@ -123,6 +124,7 @@ digitalWrite(fillRelay,LOW);
 running = 0;
 saturatedMembrane = 0;
 awayModeState = 0;
+shortStroke = 0;
 
 dayCycleTimer.start(dayCycle);
 
@@ -191,24 +193,28 @@ void loop() {                                                              //the
 
   if (dayCycleTimer.justFinished()) {
     dailyCycle();
-    serial.println("Day Cycle Started");
+    Serial.println("Daily Cycle Started");
   }
 
   if (shortStrokeTimer.justFinished()) {
     stopPump();
-    Serial.println("Short stroke prevention timer finished"
+    Serial.println("Short stroke prevention timer finished");
   }
 
   if (digitalRead(awayModeSignal) == 1) {
     if (awayModeState == 0) {
         awayModeState = 1;
         awayModeTimer.start(awayModeDelay);
+        Serial.println("Away mode timer started");
     }
   }
 
   if (digitalRead(awayModeSignal) == 0) {
-    awayModeState = 0;
-    awayModeTimer.stop();
+    if (awayModeState == 1) {
+       awayModeTimer.stop();
+       Serial.println("Away mode timer stopped");
+       awayModeState = 0;
+    }
   }
 
   if (awayModeTimer.justFinished()) {
@@ -218,8 +224,6 @@ void loop() {                                                              //the
 
 
   else if (digitalRead(runStateSignal) == 1) {
-
-    shortStrokeTimer.stop();
 
     // voltage = analogRead(A0) * 5.00 / 1024;
     // pressure = (voltage - offset) * 400;
@@ -244,6 +248,11 @@ void loop() {                                                              //the
      }
 
     string_pars();
+    if (shortStroke == 1){
+      shortStrokeTimer.stop();
+      Serial.println("Short stroke timer stopped");
+      shortStroke = 0;
+    }
 
     if (running == 0) {
       startPump();
@@ -256,6 +265,7 @@ void loop() {                                                              //the
     }
 
     else if (saturatedMembrane == 1) {
+      dischargeProduct();
       highTDSState();
     }
 
@@ -266,6 +276,7 @@ void loop() {                                                              //the
     if (runTime.justFinished()) {
       stopPump();
       delay(restTime);
+      Serial.println("Max run time finished");
     }
 
     if (highTDS.justFinished()) {
@@ -281,8 +292,10 @@ void loop() {                                                              //the
 */
 
   }
-  else if (running == 1) {
-    dayCycleTimer.start(shortStrokeDelay);
+  else if (running == 1 && shortStroke == 0) {
+    shortStrokeTimer.start(shortStrokeDelay);
+    Serial.println("Short stroke timer started");
+    shortStroke = 1;
   }
 
 }
@@ -363,6 +376,7 @@ void dischargeProduct(){
 void highTDSState(){
     dischargeProduct();
     highTDS.start(highTdsDelay);
+    Serial.println("High TDS State Called");
 }
 
 void tdsAlarm(){
@@ -383,5 +397,6 @@ void dailyCycle(){
     startPump();
     delay(flushCycle);
     stopPump();
+    Serial.println("Day Cycle Called");
 }
 
