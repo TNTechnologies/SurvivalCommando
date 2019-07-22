@@ -41,30 +41,18 @@
 
 #include <millisDelay.h>
 #include <Wire.h>                //enable I2C.
+#include <Ezo_i2c.h> //include the EZO I2C library (EZO_i2c.h is customized header file for Atlas Scientific's EZO circuits in I2C mode. Link: https://github.com/Atlas-Scientific/Ezo_I2c_lib)
 #define address 100              //default I2C ID number for EZO EC Circuit.
 
+Ezo_board EC = Ezo_board(100, "EC");      //create an EC circuit object who's address is 100 and name is "EC"
 
+bool reading_request_phase = true;        //selects our phase
 
-char computerdata[20];           //we make a 20 byte character array to hold incoming data from a pc/mac/other.
-byte received_from_computer = 0; //we need to know how many characters have been received.
-byte code = 0;                   //used to hold the I2C response code.
-char ec_data[48];                //we make a 48 byte character array to hold incoming data from the EC circuit.
-byte in_char = 0;                //used as a 1 byte buffer to store inbound bytes from the EC Circuit.
-byte i = 0;                      //counter used for ec_data array.
-int time_ = 600;                 //used to change the delay needed depending on the command sent to the EZO Class EC Circuit.
-
-char *ec;                        //char pointer used in string parsing.
-char *tds;                       //char pointer used in string parsing.
-char *sal;                       //char pointer used in string parsing.
-char *sg;                        //char pointer used in string parsing.
-
-float ec_float;                  //float var used to hold the float value of the conductivity.
-float tds_float;                 //float var used to hold the float value of the TDS.
-float sal_float;                 //float var used to hold the float value of the salinity.
-float sg_float;                  //float var used to hold the float value of the specific gravity.
+uint32_t next_poll_time = 0;              //holds the next time we receive a response, in milliseconds
+const unsigned int response_delay = 1000; //how long we wait to receive a response, in milliseconds
 
 // Values for sensor readings
-float potableWater = 1500;
+float potableWater = 500;
 const float offset = 0.483;
 float voltage, pressure;
 
@@ -137,64 +125,7 @@ dayCycleTimer.start(dayCycle);
 
 void loop() {                                                              //the main loop.
 
-  if (Serial.available() > 0) {                                             //if data is holding in the serial buffer
-    received_from_computer = Serial.readBytesUntil(13, computerdata, 20); //we read the data sent from the serial monitor(pc/mac/other) until we see a <CR>. We also count how many characters have been received.
-    computerdata[received_from_computer] = 0;                             //stop the buffer from transmitting leftovers or garbage.
-    computerdata[0] = tolower(computerdata[0]);                           //we make sure the first char in the string is lower case.
-    if (computerdata[0] == 'c' || computerdata[0] == 'r')time_ = 600;     //if a command has been sent to calibrate or take a reading we wait 600ms so that the circuit has time to take the reading.
-    else time_ = 300;
 
-
-    Wire.beginTransmission(address);                                        //call the circuit by its ID number.
-    Wire.write(computerdata);                                               //transmit the command that was sent through the serial port.
-    Wire.endTransmission();                                                 //end the I2C data transmission.
-
-    if (strcmp(computerdata, "sleep") != 0) {                               //if the command that has been sent is NOT the sleep command, wait the correct amount of time and request data.
-                                                                            //if it is the sleep command, we do nothing. Issuing a sleep command and then requesting data will wake the EC circuit.
-
-      delay(time_);                                                         //wait the correct amount of time for the circuit to complete its instruction.
-
-      Wire.requestFrom(address, 48, 1);                                     //call the circuit and request 48 bytes (this is more than we need)
-      code = Wire.read();                                                   //the first byte is the response code, we read this separately.
-
-
-      switch (code) {                           //switch case based on what the response code is.
-        case 1:                                 //decimal 1.
-          Serial.println("Success");            //means the command was successful.
-          break;                                //exits the switch case.
-
-        case 2:                                 //decimal 2.
-          Serial.println("Failed");             //means the command has failed.
-          break;                                //exits the switch case.
-
-        case 254:                               //decimal 254.
-          Serial.println("Pending");            //means the command has not yet been finished calculating.
-          break;                                //exits the switch case.
-
-        case 255:                               //decimal 255.
-          Serial.println("No Data");            //means there is no further data to send.
-          break;                                //exits the switch case.
-      }
-
-      while (Wire.available()) {                 //are there bytes to receive.
-        in_char = Wire.read();                   //receive a byte.
-        ec_data[i] = in_char;                    //load this byte into our array.
-        i += 1;                                  //incur the counter for the array element.
-        if (in_char == 0) {                      //if we see that we have been sent a null command.
-          i = 0;                                 //reset the counter i to 0.
-          Wire.endTransmission();                //end the I2C data transmission.
-          break;                                 //exit the while loop.
-        }
-      }
-
-
-      Serial.println(ec_data);                  //print the data.
-      Serial.println();                         //this just makes the output easier to read by adding an extra blank line 
-    }
-
-
-    if (computerdata[0] == 'r') string_pars(); //uncomment this function if you would like to break up the comma separated string into its individual parts.
-  }
 
   if (dayCycleTimer.justFinished()) {
     dailyCycle();
@@ -249,29 +180,38 @@ void loop() {                                                              //the
 
   else if (digitalRead(runStateSignal) == 1 && startDelayFinished == true) {
 
+  if (reading_request_phase) {                          //if were in the phase where we ask for a reading
+
+      //send a read command. we use this command instead of PH.send_cmd("R");
+      //to let the library know to parse the reading
+      EC.send_read();
+
+      next_poll_time = millis() + response_delay;         //set when the response will arrive
+      reading_request_phase = false;                      //switch to the receiving phase
+  }
+    else {                                                //if were in the receiving phase
+      if (millis() >= next_poll_time) {                   //and its time to get the response
+
+        receive_reading(EC);                              //get the reading from the EC circuit
+        if (EC.get_reading() < potableWater) {                  //test condition against EC reading
+          fillTank();
+          saturatedMembrane = true;
+        }
+
+        else if (saturatedMembrane == true) {
+          dischargeProduct();
+          highTDSState();
+        }
+
+        else {
+          dischargeProduct();
+        }
+
+      reading_request_phase = true;                     //switch back to asking for readings
+    }
+  }
     // voltage = analogRead(A0) * 5.00 / 1024;
     // pressure = (voltage - offset) * 400;
-
-    Wire.beginTransmission(address);
-    Wire.write('r');                                               //transmit the command that was sent through the serial port.
-    Wire.endTransmission();                                                 //end the I2C data transmission.
-
-    delay(time_);                                                         //wait the correct amount of time for the circuit to complete its instruction.
-
-
-    while (Wire.available()) {                 //are there bytes to receive.
-
-       in_char = Wire.read();                   //receive a byte.
-       ec_data[i] = in_char;                    //load this byte into our array.
-       i += 1;                                  //incur the counter for the array element.
-       if (in_char == 0) {                      //if we see that we have been sent a null command.
-         i = 0;                                 //reset the counter i to 0.
-         Wire.endTransmission();                //end the I2C data transmission.
-         break;                                 //exit the while loop.
-       }
-     }
-
-    string_pars();
 
     if (shortStroke == true){
       runningShortStrokeTimer.stop();
@@ -282,21 +222,6 @@ void loop() {                                                              //the
     if (running == false) {
       startPump();
       delay(30000);
-    }
-
-    if (ec_float < potableWater) {
-      fillTank();
-      saturatedMembrane = true;
-    }
-
-    else if (saturatedMembrane == true) {
-      dischargeProduct();
-      highTDSState();
-    }
-
-    else {
-      dischargeProduct();
-
     }
 
     if (runTime.justFinished()) {
@@ -324,37 +249,6 @@ void loop() {                                                              //the
     shortStroke = true;
   }
 
-}
-
-
-void string_pars() {                  //this function will break up the CSV string into its 4 individual parts. EC|TDS|SAL|SG.
-                                      //this is done using the C command “strtok”.
-
-  ec = strtok(ec_data, ",");          //let's pars the string at each comma.
-  tds = strtok(NULL, ",");            //let's pars the string at each comma.
-  sal = strtok(NULL, ",");            //let's pars the string at each comma.
-  sg = strtok(NULL, ",");             //let's pars the string at each comma.
-
-    if (Serial.available() > 0) {                                             //if data is holding in the serial buffer
-
-         Serial.print("EC:");                //we now print each value we parsed separately.
-         Serial.println(ec);                 //this is the EC value.
-
-         Serial.print("TDS:");               //we now print each value we parsed separately.
-         Serial.println(tds);                //this is the TDS value.
-
-         Serial.print("SAL:");               //we now print each value we parsed separately.
-         Serial.println(sal);                //this is the salinity value.
-
-         Serial.print("SG:");               //we now print each value we parsed separately.
-         Serial.println(sg);                //this is the specific gravity.
-         Serial.println();                  //this just makes the output easier to read by adding an extra blank line 
-    }
-
-    ec_float=atof(ec);
-    tds_float=atof(tds);
-    sal_float=atof(sal);
-    sg_float=atof(sg);
 }
 
 void startPump(){
@@ -391,14 +285,14 @@ void fillTank(){
     digitalWrite(fillRelay,HIGH);
     highTDS.stop();
     Serial.println("Fill tank - EC:");
-    Serial.println(ec_float);
+    Serial.println(EC.get_reading());
 }
 
 void dischargeProduct(){
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
     Serial.println("Discharge Product - EC:");
-    Serial.println(ec_float);
+    Serial.println(EC.get_reading());
 }
 
 
@@ -430,3 +324,27 @@ void dailyCycle(){
 }
 
 
+void receive_reading(Ezo_board &Sensor) {               // function to decode the reading after the read command was issued
+
+  Serial.print(Sensor.get_name()); Serial.print(": ");  // print the name of the circuit getting the reading
+
+  Sensor.receive_read();                                //get the response data and put it into the [Sensor].reading variable if successful
+
+  switch (Sensor.get_error()) {                         //switch case based on what the response code is.
+    case Ezo_board::SUCCESS:
+      Serial.print(Sensor.get_reading());               //the command was successful, print the reading
+      break;
+
+    case Ezo_board::FAIL:
+      Serial.print("Failed ");                          //means the command has failed.
+      break;
+
+    case Ezo_board::NOT_READY:
+      Serial.print("Pending ");                         //the command has not yet been finished calculating.
+      break;
+
+    case Ezo_board::NO_DATA:
+      Serial.print("No Data ");                         //the sensor has no data to send.
+      break;
+  }
+}
