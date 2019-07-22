@@ -79,22 +79,25 @@ byte runStateSignal = 5;
 byte awayModeSignal = 4;
 
 // State buffers
-int running = 0;
-int saturatedMembrane = 0;
-int awayModeState = 0;
-int shortStroke = 0;
+bool running = false;
+bool saturatedMembrane = false;
+bool awayModeState = false;
+bool shortStroke = false;
+bool startDelayFinished = false;
+bool startSignalRecieved = false;
 
 //define timing variables
 millisDelay runTime;
 millisDelay highTDS;
 millisDelay awayModeTimer;
 millisDelay dayCycleTimer;
-millisDelay shortStrokeTimer;
-unsigned long maxRunTime = 14400000;
-unsigned long highTdsDelay = 600000;
-unsigned long restTime = 1200000;
+millisDelay runningShortStrokeTimer;
+millisDelay startShortStrokeTimer;
+unsigned long maxRunTime = 21600000;
+unsigned long highTdsDelay = 1800000;
+unsigned long restTime = 1800000;
 unsigned long awayModeDelay = 259200000;
-unsigned long shortStrokeDelay = 20000;
+unsigned long shortStrokeDelay = 600000;
 unsigned long dayCycle = 86400000;
 unsigned long flushCycle = 600000;
 
@@ -121,10 +124,12 @@ digitalWrite(dischargeRelay,LOW);
 digitalWrite(fillRelay,LOW);
 //digitalWrite(spareRelay,LOW);    //Disable
 
-running = 0;
-saturatedMembrane = 0;
-awayModeState = 0;
-shortStroke = 0;
+running = false;
+saturatedMembrane = false;
+awayModeState = false;
+shortStroke = false;
+startDelayFinished = false;
+startSignalRecieved = false;
 
 dayCycleTimer.start(dayCycle);
 
@@ -196,34 +201,53 @@ void loop() {                                                              //the
     Serial.println("Daily Cycle Started");
   }
 
-  if (shortStrokeTimer.justFinished()) {
+  if (runningShortStrokeTimer.justFinished()) {
     stopPump();
     Serial.println("Short stroke prevention timer finished");
   }
 
-  if (digitalRead(awayModeSignal) == 1) {
-    if (awayModeState == 0) {
-        awayModeState = 1;
+  if (startShortStrokeTimer.justFinished()) {
+    Serial.println("Start Short Stroke Timer Finished");
+    startDelayFinished = true;
+  }
+
+  if (digitalRead(awayModeSignal) == true) {
+    if (awayModeState == false) {
+        awayModeState = true;
         awayModeTimer.start(awayModeDelay);
         Serial.println("Away mode timer started");
     }
   }
 
-  if (digitalRead(awayModeSignal) == 0) {
-    if (awayModeState == 1) {
+  if (digitalRead(awayModeSignal) == false) {
+    if (awayModeState == true) {
        awayModeTimer.stop();
        Serial.println("Away mode timer stopped");
-       awayModeState = 0;
+       awayModeState = false;
     }
   }
 
+
   if (awayModeTimer.justFinished()) {
-        delay(restTime);
-        Serial.println("Away mode timer finished");
+     Serial.println("Away mode timer finished");
+     delay(restTime);
   }
 
+  else if (digitalRead(runStateSignal) == 0 && startShortStrokeTimer.remaining() > 0) {
+    startShortStrokeTimer.stop();
+    startSignalRecieved = false;
+    Serial.println("Start Short Stroke Time Stopped");
 
-  else if (digitalRead(runStateSignal) == 1) {
+}
+
+  else if(digitalRead(runStateSignal) == 1 && startSignalRecieved == false) {
+    startShortStrokeTimer.start(shortStrokeDelay);
+    startSignalRecieved = true;
+    Serial.println("Start Signal Recieved");
+
+  }
+
+  else if (digitalRead(runStateSignal) == 1 && startDelayFinished == true) {
 
     // voltage = analogRead(A0) * 5.00 / 1024;
     // pressure = (voltage - offset) * 400;
@@ -248,35 +272,37 @@ void loop() {                                                              //the
      }
 
     string_pars();
-    if (shortStroke == 1){
-      shortStrokeTimer.stop();
+
+    if (shortStroke == true){
+      runningShortStrokeTimer.stop();
       Serial.println("Short stroke timer stopped");
-      shortStroke = 0;
+      shortStroke = false;
     }
 
-    if (running == 0) {
+    if (running == false) {
       startPump();
       delay(30000);
     }
 
     if (ec_float < potableWater) {
       fillTank();
-      saturatedMembrane = 1;
+      saturatedMembrane = true;
     }
 
-    else if (saturatedMembrane == 1) {
+    else if (saturatedMembrane == true) {
       dischargeProduct();
       highTDSState();
     }
 
     else {
       dischargeProduct();
+
     }
 
     if (runTime.justFinished()) {
       stopPump();
-      delay(restTime);
       Serial.println("Max run time finished");
+      delay(restTime);
     }
 
     if (highTDS.justFinished()) {
@@ -292,10 +318,10 @@ void loop() {                                                              //the
 */
 
   }
-  else if (running == 1 && shortStroke == 0) {
-    shortStrokeTimer.start(shortStrokeDelay);
+  else if (running == true && shortStroke == false) {
+    runningShortStrokeTimer.start(shortStrokeDelay);
     Serial.println("Short stroke timer started");
-    shortStroke = 1;
+    shortStroke = true;
   }
 
 }
@@ -338,7 +364,7 @@ void startPump(){
     digitalWrite(fillRelay,LOW);
     // Start Run Timer
     runTime.start(maxRunTime);
-    running = 1;
+    running = true;
     dayCycleTimer.stop();
     Serial.println("System started");
 }
@@ -351,11 +377,12 @@ void stopPump(){
     delay(2000);                            //Delay 2 Seconds to release pressure.
     digitalWrite(dischargeRelay,LOW);
     runTime.stop();
-    running = 0;
-    saturatedMembrane = 0;
+    running = false;
+    saturatedMembrane = false;
   //  digitalWrite(runStateSignal, LOW);
     dayCycleTimer.start(dayCycle);
     Serial.println("System Stopped");
+    startDelayFinished = false;
 }
 
 void fillTank(){
@@ -363,13 +390,15 @@ void fillTank(){
     digitalWrite(dischargeRelay,LOW);
     digitalWrite(fillRelay,HIGH);
     highTDS.stop();
-    Serial.println("Fill tank");
+    Serial.println("Fill tank - EC:");
+    Serial.println(ec_data);
 }
 
 void dischargeProduct(){
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
-    Serial.println("Discharge Product");
+    Serial.println("Discharge Product - EC:");
+    Serial.println(ec_data);
 }
 
 
@@ -399,4 +428,5 @@ void dailyCycle(){
     stopPump();
     Serial.println("Day Cycle Called");
 }
+
 
