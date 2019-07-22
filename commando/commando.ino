@@ -391,14 +391,14 @@ void fillTank(){
     digitalWrite(fillRelay,HIGH);
     highTDS.stop();
     Serial.println("Fill tank - EC:");
-    Serial.println(ec_data);
+    Serial.println(ec_float);
 }
 
 void dischargeProduct(){
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
     Serial.println("Discharge Product - EC:");
-    Serial.println(ec_data);
+    Serial.println(ec_float);
 }
 
 
