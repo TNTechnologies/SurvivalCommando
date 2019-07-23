@@ -350,3 +350,4 @@ void receive_reading(Ezo_board &Sensor) {               // function to decode th
       break;
   }
 }
+
