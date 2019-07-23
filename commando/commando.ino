@@ -86,6 +86,7 @@ unsigned long highTdsDelay = 1800000;
 unsigned long restTime = 1800000;
 unsigned long awayModeDelay = 259200000;
 unsigned long shortStrokeDelay = 600000;
+unsigned long startShortStrokeDelay = 60000;
 unsigned long dayCycle = 86400000;
 unsigned long flushCycle = 600000;
 
@@ -172,7 +173,7 @@ void loop() {                                                              //the
 }
 
   else if(digitalRead(runStateSignal) == 1 && startSignalRecieved == false) {
-    startShortStrokeTimer.start(shortStrokeDelay);
+    startShortStrokeTimer.start(startShortStrokeDelay);
     startSignalRecieved = true;
     Serial.println("Start Signal Recieved");
 
@@ -228,6 +229,7 @@ void loop() {                                                              //the
       stopPump();
       Serial.println("Max run time finished");
       delay(restTime);
+      startPump();
     }
 
     if (highTDS.justFinished()) {
