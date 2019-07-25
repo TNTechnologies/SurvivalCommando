@@ -129,13 +129,13 @@ void loop() {                                                              //the
 
 
   if (dayCycleTimer.justFinished()) {
-    dailyCycle();
     Serial.println("Daily Cycle Started");
+    dailyCycle();
   }
 
   if (runningShortStrokeTimer.justFinished()) {
-    stopPump();
     Serial.println("Short stroke prevention timer finished");
+    stopPump();
   }
 
   if (startShortStrokeTimer.justFinished()) {
@@ -159,24 +159,21 @@ void loop() {                                                              //the
     }
   }
 
+  if(digitalRead(runStateSignal) == 1 && startSignalRecieved == false) {
+    startShortStrokeTimer.start(startShortStrokeDelay);
+    startSignalRecieved = true;
+    Serial.println("Start Signal Recieved");
+  }
+
+  if (digitalRead(runStateSignal) == 0 && startShortStrokeTimer.remaining() > 0) {
+    startShortStrokeTimer.stop();
+    startSignalRecieved = false;
+    Serial.println("Start Short Stroke Time Stopped");
+}
 
   if (awayModeTimer.justFinished()) {
      Serial.println("Away mode timer finished");
      delay(restTime);
-  }
-
-  else if (digitalRead(runStateSignal) == 0 && startShortStrokeTimer.remaining() > 0) {
-    startShortStrokeTimer.stop();
-    startSignalRecieved = false;
-    Serial.println("Start Short Stroke Time Stopped");
-
-}
-
-  else if(digitalRead(runStateSignal) == 1 && startSignalRecieved == false) {
-    startShortStrokeTimer.start(startShortStrokeDelay);
-    startSignalRecieved = true;
-    Serial.println("Start Signal Recieved");
-
   }
 
   else if (digitalRead(runStateSignal) == 1 && startDelayFinished == true) {
@@ -209,8 +206,8 @@ void loop() {                                                              //the
         }
 
       reading_request_phase = true;                     //switch back to asking for readings
+      }
     }
-  }
     // voltage = analogRead(A0) * 5.00 / 1024;
     // pressure = (voltage - offset) * 400;
 
@@ -277,8 +274,8 @@ void stopPump(){
     saturatedMembrane = false;
   //  digitalWrite(runStateSignal, LOW);
     dayCycleTimer.start(dayCycle);
-    Serial.println("System Stopped");
     startDelayFinished = false;
+    Serial.println("System Stopped");
 }
 
 void fillTank(){
