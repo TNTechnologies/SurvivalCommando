@@ -283,14 +283,14 @@ void fillTank(){
     digitalWrite(dischargeRelay,LOW);
     digitalWrite(fillRelay,HIGH);
     highTDS.stop();
-    Serial.println("Fill tank - EC:");
+    Serial.println("Fill tank");
     Serial.println(EC.get_reading());
 }
 
 void dischargeProduct(){
     digitalWrite(dischargeRelay,HIGH);
     digitalWrite(fillRelay,LOW);
-    Serial.println("Discharge Product - EC:");
+    Serial.println("Discharge Product");
     Serial.println(EC.get_reading());
 }
 
